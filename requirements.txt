@@ -19,3 +19,5 @@ matplotlib>=3.7.0
 # --- Computer Vision (Camera Monitor) ---
 mediapipe>=0.10.0
 opencv-python>=4.8.0
+
+subprocess
