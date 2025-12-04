@@ -8,7 +8,7 @@ import os
 STATUS_FILE = "monitor_status.txt"
 
 class HyperactivityMonitor:
-    def __init__(self, threshold=0.001, alert_cooldown=10):
+    def __init__(self, threshold=0.5, alert_cooldown=10):
         print("🧠 Initializing AI Engine (MediaPipe)...")
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
@@ -39,11 +39,10 @@ class HyperactivityMonitor:
         return displacement / len(key_indices)
 
     def trigger_alert(self):
-        # This print confirms the code is running
         print("🚨 WRITING ALERT TO FILE...") 
         with open(STATUS_FILE, "w") as f:
             f.write("ALERT: High Hyperactivity Detected!")
-            
+
     def clear_alert(self):
         with open(STATUS_FILE, "w") as f:
             f.write("Normal")
@@ -104,8 +103,10 @@ def find_working_camera():
 
     for index, backend, name in configs:
         print(f"   Testing: {name}...", end=" ")
-        cap = cv2.VideoCapture(index, backend)
         
+        # --- FIX IS HERE: Use 'backend', not hardcoded 'DSHOW' ---
+        cap = cv2.VideoCapture(index, backend)
+
         if not cap.isOpened():
             print("Failed (Closed).")
             continue
@@ -141,7 +142,7 @@ if __name__ == "__main__":
     print("   (Press 'q' to quit)")
 
     # 2. Start the Logic
-    monitor = HyperactivityMonitor(threshold=0.08)
+    monitor = HyperactivityMonitor(threshold=0.01) # Lower threshold for easier testing
 
     while cap.isOpened():
         ret, frame = cap.read()
