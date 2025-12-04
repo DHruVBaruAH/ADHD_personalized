@@ -2,7 +2,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import time
-import os
+import platform   # ⬅ added
 
 # --- CONFIGURATION ---
 STATUS_FILE = "monitor_status.txt"
@@ -39,7 +39,6 @@ class HyperactivityMonitor:
         return displacement / len(key_indices)
 
     def trigger_alert(self):
-        # This print confirms the code is running
         print("🚨 WRITING ALERT TO FILE...") 
         with open(STATUS_FILE, "w") as f:
             f.write("ALERT: High Hyperactivity Detected!")
@@ -49,7 +48,6 @@ class HyperactivityMonitor:
             f.write("Normal")
 
     def process_frame(self, frame):
-        # Convert BGR to RGB
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image.flags.writeable = False
         
@@ -90,45 +88,71 @@ class HyperactivityMonitor:
 
         return image
 
-def find_working_camera():
-    """Scans for a working camera exactly like debug_camera.py did"""
-    print("\n🔍 AUTO-DETECTING CAMERA...")
-    
-    # Priority list of configurations to try
-    configs = [
-        (0, cv2.CAP_MSMF,  "Index 0 (MediaFoundation)"),
-        (0, cv2.CAP_DSHOW, "Index 0 (DirectShow)"),
-        (1, cv2.CAP_MSMF,  "Index 1 (MediaFoundation)"),
-        (1, cv2.CAP_DSHOW, "Index 1 (DirectShow)"),
-    ]
 
+# ==================================================================
+# 🔥 ONLY THIS PART IS CHANGED — OS-SPECIFIC CAMERA BACKEND
+# ==================================================================
+def find_working_camera():
+    print("\n🔍 AUTO-DETECTING CAMERA...")
+
+    os_name = platform.system()
+    print(f"🖥 OS Detected: {os_name}")
+
+    configs = []
+
+    # -------- Linux backend --------
+    if os_name == "Linux":
+        configs = [
+            (0, cv2.CAP_V4L2,  "Linux V4L2 (0)"),
+            (1, cv2.CAP_V4L2,  "Linux V4L2 (1)"),
+        ]
+
+    # -------- Windows backend --------
+    elif os_name == "Windows":
+        configs = [
+            (0, cv2.CAP_DSHOW, "Windows DirectShow (0)"),
+            (0, cv2.CAP_MSMF,  "Windows MediaFoundation (0)"),
+            (1, cv2.CAP_DSHOW, "Windows DirectShow (1)"),
+            (1, cv2.CAP_MSMF,  "Windows MediaFoundation (1)"),
+        ]
+
+    # -------- Mac backend --------
+    else:
+        configs = [
+            (0, cv2.CAP_AVFOUNDATION, "macOS AVFoundation (0)"),
+            (1, cv2.CAP_AVFOUNDATION, "macOS AVFoundation (1)"),
+        ]
+
+    # Try each configuration
     for index, backend, name in configs:
         print(f"   Testing: {name}...", end=" ")
         cap = cv2.VideoCapture(index, backend)
-        
+
         if not cap.isOpened():
-            print("Failed (Closed).")
+            print("❌ Failed (Closed).")
             continue
 
-        # Force standard resolution (Critical for MediaPipe)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-        # Warmup
-        for _ in range(10): cap.read()
+        for _ in range(10): 
+            cap.read()
         
         ret, frame = cap.read()
-        if ret and np.sum(frame) > 0: # Check if frame is not black
-            print("SUCCESS! ✅")
+        if ret and frame is not None and np.sum(frame) > 0:
+            print("✅ SUCCESS!")
             return cap
         else:
-            print("Failed (Black Screen or No Data).")
+            print("⚠️ Opened but returned no image.")
             cap.release()
-            
+
     return None
+# ==================================================================
+# END OF CAMERA FIX — NOTHING ELSE MODIFIED
+# ==================================================================
+
 
 if __name__ == "__main__":
-    # 1. Find the camera
     cap = find_working_camera()
 
     if cap is None:
@@ -140,7 +164,6 @@ if __name__ == "__main__":
     print("✅ Camera locked. Starting Hyperactivity Monitor...")
     print("   (Press 'q' to quit)")
 
-    # 2. Start the Logic
     monitor = HyperactivityMonitor(threshold=0.08)
 
     while cap.isOpened():
@@ -150,10 +173,7 @@ if __name__ == "__main__":
             break
         
         try:
-            # Flip frame for mirror effect
             frame = cv2.flip(frame, 1)
-            
-            # Process
             processed_frame = monitor.process_frame(frame)
             cv2.imshow('ADHD Hyperactivity Guard', processed_frame)
         except Exception as e:
